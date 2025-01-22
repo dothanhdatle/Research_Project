@@ -73,7 +73,7 @@ class MoCo(nn.Module):
         if ptr + batch_size <= self.K:
             # If there is enough space in the queue, enqueue directly
             self.queue[:, ptr:ptr + batch_size] = keys.T
-            ptr += batch_size
+            ptr = (ptr + batch_size) % self.K
         else:
             # If not enough space in queue for a batch size
             # Fill the remaining space first
@@ -87,7 +87,7 @@ class MoCo(nn.Module):
         # Update the pointer
         self.queue_ptr[0] = ptr
 
-    def forward(self, im_q, im_k):
+    def forward(self, im_q, im_k, training = True):
         """
         Input:
             im_q: a batch of query
@@ -97,24 +97,25 @@ class MoCo(nn.Module):
         # compute query features by the query encoder
         q = self.encoder_q(im_q)  # queries: NxC
         q = F.normalize(q, dim=1)
-        #print("Query grad_fn:", q.grad_fn)  # Should not be None
+        #print("Query grad_fn:", q.grad_fn)  e
 
         # compute key features by the key encoder
         with torch.no_grad():  # no gradient to keys
-            self._momentum_update_key_encoder()  # update the key encoder
+            if training:
+                self._momentum_update_key_encoder()  # update the key encoder
 
             k = self.encoder_k(im_k)  # keys: NxC
             k = F.normalize(k, dim=1)
-            #print("Key grad_fn (should be None):", k.grad_fn)  # Should be None since no grad
+            #print("Key grad_fn (should be None):", k.grad_fn)  
 
         # compute logits
         # Einstein sum is more intuitive
         # positive logits: Nx1
         l_pos = torch.einsum('nc,nc->n', [q, k]).unsqueeze(-1)
-        #print("l_pos grad_fn:", l_pos.grad_fn)  # Check if gradients flow here
+        #print("l_pos grad_fn:", l_pos.grad_fn)  
         # negative logits: NxK
         l_neg = torch.einsum('nc,ck->nk', [q, self.queue.clone().detach()])
-        #print("l_neg grad_fn:", l_neg.grad_fn)  # Check if gradients flow here
+        #print("l_neg grad_fn:", l_neg.grad_fn)  
 
         # logits: Nx(1+K)
         logits = torch.cat([l_pos, l_neg], dim=1)
@@ -128,7 +129,8 @@ class MoCo(nn.Module):
         #print("Labels grad_fn:", labels.grad_fn)  # Should be None, as labels are constant
 
         # dequeue and enqueue
-        self._dequeue_and_enqueue(k)
+        if training:
+            self._dequeue_and_enqueue(k)
 
         return logits, labels
 

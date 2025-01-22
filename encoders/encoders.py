@@ -30,7 +30,7 @@ class STGCN_model(nn.Module):
     """
 
     def __init__(self, in_channels, hidden_channels, hidden_dim, out_dim , graph_args,
-                 edge_importance_weighting):
+                 edge_importance_weighting, dropout_rate):
         super(STGCN_model, self).__init__()
 
         # load graph
@@ -45,17 +45,18 @@ class STGCN_model(nn.Module):
         self.data_bn = nn.BatchNorm1d(in_channels * A.size(1))  # Batch normalization 
         self.st_gcn_net = nn.ModuleList((
             st_gcn(in_channels, hidden_channels, kernel_size, stride=1, residual=False),  # (N, hidden_channels, T, V)
-            st_gcn(hidden_channels, hidden_channels, kernel_size, stride=1),
-            #st_gcn(hidden_channels, hidden_channels, kernel_size, stride=1),
-            #st_gcn(hidden_channels, hidden_channels, kernel_size, stride=1),
-            st_gcn(hidden_channels, hidden_channels*2, kernel_size, stride=2),  # (N, hidden_channels, T/2, V)
-            st_gcn(hidden_channels*2, hidden_channels*2, kernel_size, stride=1),
-            #st_gcn(hidden_channels*2, hidden_channels*2, kernel_size, stride=1),
-            st_gcn(hidden_channels*2, hidden_channels*4, kernel_size, stride=2),  # (N, hidden_channels, T/4, V)
-            #st_gcn(hidden_channels*4, hidden_channels*4, kernel_size, stride=1),
-            st_gcn(hidden_channels*4, hidden_dim, kernel_size, stride=1), # (N, hidden_dim, T/4, V)
+            st_gcn(hidden_channels, hidden_channels, kernel_size, stride=1, dropout=dropout_rate),
+            st_gcn(hidden_channels, hidden_channels, kernel_size, stride=1, dropout=dropout_rate),
+            st_gcn(hidden_channels, hidden_channels, kernel_size, stride=1, dropout=dropout_rate),
+            st_gcn(hidden_channels, hidden_channels*2, kernel_size, stride=2, dropout=dropout_rate),  # (N, hidden_channels, T/2, V)
+            st_gcn(hidden_channels*2, hidden_channels*2, kernel_size, stride=1, dropout=dropout_rate),
+            st_gcn(hidden_channels*2, hidden_channels*2, kernel_size, stride=1, dropout=dropout_rate),
+            st_gcn(hidden_channels*2, hidden_channels*4, kernel_size, stride=2, dropout=dropout_rate),  # (N, hidden_channels, T/4, V)
+            st_gcn(hidden_channels*4, hidden_channels*4, kernel_size, stride=1, dropout=dropout_rate),
+            st_gcn(hidden_channels*4, hidden_dim, kernel_size, stride=1, dropout=dropout_rate), # (N, hidden_dim, T/4, V)
         ))
 
+        self.fc = nn.Linear(hidden_dim, out_dim)
         # initialize parameters for edge importance weighting
         if edge_importance_weighting:
             self.edge_importance = nn.ParameterList([
@@ -63,10 +64,8 @@ class STGCN_model(nn.Module):
                 for i in self.st_gcn_net
             ])
         else:
-            self.edge_importance = [1] * len(self.st_gcn_net)
-
-        #self.fc = nn.Linear(hidden_dim, out_dim) 
-        self.fc = nn.Conv2d(hidden_dim, out_dim, kernel_size=1)
+            self.edge_importance = [1] * len(self.st_gcn_net) 
+        
 
     def forward(self, x):
 
@@ -84,11 +83,10 @@ class STGCN_model(nn.Module):
 
         # global pooling both the temporal and spatial dimensions
         x = F.avg_pool2d(x, x.size()[2:]) # (N, hidden_dim, 1, 1)
-        #x = x.view(N, -1)
+        x = x.view(N, -1)
 
         # prediction
-        x = self.fc(x)  # (N, out_dim, 1, 1)
-        x = x.view(x.size(0), -1)  # (N, out_dim)
+        x = self.fc(x)  # (N, out_dim)
 
         return x
 
