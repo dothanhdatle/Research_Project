@@ -5,7 +5,7 @@ import copy
 
 
 class MoCo(nn.Module):
-    """ Referring to the code of MOCO, https://arxiv.org/abs/1911.05722 """
+    """ Referring to the paper of MoCo: https://arxiv.org/abs/1911.05722 """
     def __init__(self, base_encoder, dim=128, K=65536, m=0.999, T=0.07, mlp=False):
         """
         base_encoder: the encoder network to encode keys and queries

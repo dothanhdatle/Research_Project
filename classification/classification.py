@@ -14,15 +14,22 @@ class SSL_model(nn.Module):
         for param in self.contrastive_encoder.parameters():
             param.requires_grad = False
         
-        for param in self.classifier.parameters():
-            param.requires_grad = True
-    
     def forward(self,x):
         self.contrastive_encoder.eval()
         with torch.no_grad():
-            x = self.contrastive_encoder(x)
+            feature = self.contrastive_encoder(x)
         
-        x = F.normalize(x, 1)
+        output = self.classifier(feature)
+        return output
+    
+class Classifier(nn.Module):
+    def __init__(self, hidden_dim, num_classes = 16):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.num_classes = num_classes
+        self.classifier = nn.Linear(self.hidden_dim, self.num_classes)
+    
+    def forward(self,x):
         logits = self.classifier(x)
         return logits
     

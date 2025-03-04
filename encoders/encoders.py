@@ -90,26 +90,6 @@ class STGCN_model(nn.Module):
 
         return x
 
-    """ def extract_feature(self, x):
-
-        # Input data (N,T,V,C)
-        N, T, V, C= x.size()
-        x = x.permute(0, 2, 3, 1).contiguous()  # (N,V,C,T)
-        x = x.view(N, V * C, T)
-        x = self.data_bn(x) 
-        x = x.view(N, V, C, T)
-        x = x.permute(0, 2, 3, 1).contiguous()  # (N,C,T,V)
-
-        # forwaRd
-        for gcn, importance in zip(self.st_gcn_net, self.edge_importance):
-            x, _ = gcn(x, self.A * importance)
-
-        feature = x # (N, hidden_dim, T/4, V)
-
-        output = self.fc(x)# (N, out_dim, t, v)
-
-        return output, feature """
-
 class st_gcn(nn.Module):
     r"""Applies a spatial temporal graph convolution over an input graph sequence.
 
@@ -192,97 +172,6 @@ class st_gcn(nn.Module):
 
         return self.relu(x), A
     
-
-## Transformers encoder
-class PositionalEncoding(nn.Module):
-    def __init__(self, embed_dim, max_len=5000):
-        super(PositionalEncoding, self).__init__()
-        position = torch.arange(0, max_len).unsqueeze(1)
-        div_term = torch.exp(
-            torch.arange(0, embed_dim, 2) * (-torch.log(torch.tensor(10000.0)) / embed_dim)
-        )
-
-        pe = torch.zeros(max_len, embed_dim)
-        pe[:, 0::2] = torch.sin(position * div_term)
-
-        if embed_dim % 2 == 1:
-            pe[:, 1::2] = torch.cos(position * div_term[:-1])
-        else:
-            pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0) 
-
-        self.register_buffer("pe", pe)
-
-class LearnablePositionalEncoding(nn.Module):
-    def __init__(self, embed_dim, max_len=5000):
-        super(LearnablePositionalEncoding, self).__init__()
-        self.position_embedding = nn.Parameter(torch.zeros(1, max_len, embed_dim))
-        nn.init.xavier_uniform_(self.position_embedding)
-
-    def forward(self, x):
-        return x + self.position_embedding[:, :x.size(1)]
-    
-class TransformersEncoder(nn.Module):
-    def __init__(self, input_dim, embed_dim, num_heads, num_layers, max_len=5000, norm_first=True, dropout=0.1):
-
-        super(TransformersEncoder, self).__init__()
-        self.embed_dim = embed_dim
-        self.embedding = nn.Linear(input_dim, embed_dim)
-
-        self.positional_encoding = PositionalEncoding(embed_dim, max_len)
-        #self.positional_encoding = LearnablePositionalEncoding(embed_dim, max_len)
-        encoder_layers = nn.TransformerEncoderLayer(d_model=embed_dim, 
-                                                    nhead=num_heads, 
-                                                    dim_feedforward=embed_dim*4,
-                                                    dropout=dropout, 
-                                                    batch_first=True,
-                                                    norm_first=norm_first)
-
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_layers)
-        self.pool = nn.AdaptiveAvgPool1d(1)
-
-        # Attention-based Temporal Pooling
-
-    def forward(self, x):
-        
-        x = self.embedding(x)
-        x = self.positional_encoding(x)
-
-        out = self.transformer_encoder(x)  # (N,T,embed_dim)
-        out = out.permute(0,2,1)  # (N,embed_dim,T)
-        out = self.pool(out).squeeze(-1) # (N,embed_dim) 
-
-        return out
-
-## LSTM encoder
-class LSTMEncoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_layers, output_dim, bidirectional=True):
-        super(LSTMEncoder, self).__init__()
-        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, bidirectional=bidirectional)
-        if bidirectional:
-            self.fc = nn.Linear(hidden_dim*2, output_dim)
-        else:
-            self.fc = nn.Linear(hidden_dim, output_dim)
-
-    def forward(self, x):
-        out, _ = self.lstm(x)  
-        out = self.fc(out[:, -1, :])  # Take last time step output
-        return out
-
-## GRU encoder
-class GRUEncoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_layers, output_dim, bidirectional=True):
-        super(GRUEncoder, self).__init__()
-        self.gru = nn.GRU(input_dim, hidden_dim, num_layers, batch_first=True, bidirectional=bidirectional)
-        if bidirectional:
-            self.fc = nn.Linear(hidden_dim*2, output_dim)
-        else:
-            self.fc = nn.Linear(hidden_dim, output_dim)
-
-    def forward(self, x):
-        out, _ = self.gru(x)  
-        out = self.fc(out[:, -1, :])  # Take last time step output
-        return out  
 
 
     

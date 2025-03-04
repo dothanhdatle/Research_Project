@@ -6,101 +6,36 @@ from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 
 from ..dataset.dataloader import SHREC22_data
-from ..contrastive.moco import MoCo
+from ..contrastive.moco_v3 import MoCo_v3, MoCo_model
 from ..augmentations.augmentations import augmentations_sequence1, augmentations_sequence2
 from ..encoders.encoders import STGCN_model
 
+def train_(trainloader, model, augmentation, n_epochs, learning_rate, print_rate):
+    train_loss = []
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    for epoch in tqdm(range(n_epochs)):
+        # Training
+        model.train()
+        total_train_loss = 0.0
+        for batch in trainloader:
+            seqs = batch['Sequence'].float().to(model.device)
+            seqs_aug1 = augmentation(seqs)
+            seqs_aug2 = augmentation(seqs)
+            optimizer.zero_grad()
 
-# Hyperparameters
-train_path = './dataset/training_set/training_set/'
-test_path = './dataset/training_set/test_set/'
-T = 90  # Sequence length4
+            # Forward pass
+            loss = model(seqs_aug1, seqs_aug2, training=True)
 
-seed=42
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            # Backward pass
+            loss.backward()
+            optimizer.step()
 
-# Load train data
-trainset = SHREC22_data(train_path, T)
-# Extract labels and indices
-labels = [data['Label'] for data in trainset]
-indices = list(range(len(trainset)))
+            total_train_loss += loss.item()
+        train_loss.append(total_train_loss/len(trainloader))
 
-# train validation split
-train_indices, val_indices = train_test_split(
-    indices, 
-    test_size=0.2,    
-    stratify=labels,  
-    random_state=seed   
-)
-
-# Create subsets for training and validation
-train_set = Subset(trainset, train_indices)
-val_set = Subset(trainset, val_indices)
-
-print('Train set size:',len(train_set))
-print('Validation set size:',len(val_set))
-
-# Hyperparameters for self-supervised training
-batch_size = 64
-learning_rate = 1e-3
-queue_size = 10000
-graph_args = {
-    'strategy': 'spatial',
-    'max_hop': 1,
-    'dilation': 1
-}
-
-momentum = 0.999 # momentum
-temperature = 0.07 # temperature
-
-# Data loader for self-supervised without labels
-trainloader_ssl = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-valloader_ssl = DataLoader(val_set, batch_size=batch_size, shuffle=True)
-# Data augmentation
-augmentations1 = augmentations_sequence1()
-augmentations2 = augmentations_sequence2()
-
-# Load base encoder for MoCo
-base_encoder = STGCN_model(in_channels=3, 
-                           hidden_channels=16, 
-                           hidden_dim=64, out_dim=128, 
-                           graph_args=graph_args, 
-                           edge_importance_weighting=True,
-                           dropout_rate=0).to(device)
-
-# Load MoCo Model
-moco_model = MoCo(base_encoder=base_encoder, 
-                  dim = 128, 
-                  K=queue_size, 
-                  m=momentum, 
-                  T=temperature,
-                  mlp=False).to(device)
-
-n_epochs = 1000
-optimizer = optim.Adam(moco_model.parameters(), lr=learning_rate)
-loss_fn = nn.CrossEntropyLoss()
-# Training Loop
-for epoch in tqdm(range(n_epochs)):
-    moco_model.train()
-    total_loss = 0.0
-    for batch in trainloader_ssl:
-        seqs = batch['Sequence'].float().to(device)
-        seqs_aug1 = augmentations1(seqs)
-        seqs_aug2 = augmentations1(seqs)
-
-        # Forward pass
-        logits, labels = moco_model(seqs_aug1, seqs_aug2)
-        loss = loss_fn(logits, labels)
-
-        # Backward pass
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-
-    print(f"Epoch [{epoch+1}/{n_epochs}], Loss: {total_loss/len(trainloader_ssl):.4f}")
-
-# Save the model
-torch.save(moco_model.state_dict(), 'moco_stgcn.pth')
+        if (epoch + 1) % print_rate == 0:
+            print(f"Epoch [{epoch+1}/{n_epochs}]")
+            print(f"  Train Loss: {train_loss[-1]:.4f}")
+    
+    return model, train_loss
 

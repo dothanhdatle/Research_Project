@@ -94,45 +94,6 @@ class RandomHorizontalFlip(nn.Module):
 
         return temp
 
-class GaussianNoise(nn.Module):
-    def __init__(self, std=0.01):
-        super().__init__()
-        self.std = std
-
-
-    def forward(self, sequences):
-
-        noise = torch.randn_like(sequences) * self.std
-
-        return sequences + noise
-    
-class GaussianBlurConv(nn.Module):
-    def __init__(self, channels = 3, kernel_length = 15, sigma_range = [0.1, 2]):
-        super(GaussianBlurConv, self).__init__()
-        self.channels = channels
-        self.kernel_length = kernel_length
-        self.sigma_range = sigma_range
-        radius = int(kernel_length / 2)
-        self.kernel_index = np.arange(-radius, radius + 1)
-
-    def forward(self, sequences):
-        device = sequences.device
-        sigma = random.uniform(self.sigma_range[0], self.sigma_range[1])
-        blur_flter = np.exp(-np.power(self.kernel_index, 2.0) / (2.0 * np.power(sigma, 2.0)))
-        kernel = torch.from_numpy(blur_flter).unsqueeze(0).unsqueeze(0).float()
-        # kernel =  kernel.float()
-        kernel = kernel.repeat(self.channels, 1, 1, 1).to(device) # (C,1,1,kernel_size)
-        self.weight = nn.Parameter(data=kernel, requires_grad=False)
-
-        prob = np.random.random_sample()
-        temp = sequencess.clone()
-        if prob < 0.5:
-            temp = temp.permute(0,3,2,1) # N,C,V,T
-            temp = F.conv2d(temp, self.weight, padding=(0, int((self.kernel_length - 1) / 2 )), groups=self.channels)
-            temp = temp.permute(0,3,2,1) # N,T,V,C
-
-        return temp
-
 class JointSubtract(nn.Module):
     def __init__(self, joint=1):
         super().__init__()
@@ -296,9 +257,3 @@ def augmentations_sequence2():
         RandomApplyTransform(VideoSlowDown(), p = 0.5)
     ])
     return augmentations
-
-# RandomApplyTransform(VideoSlowDown(), p = 0.5)
-# RandomApplyTransform(JointSubtract(joint=1), p=0.5),
-# RandomApplyTransform(RandomTemporalCropAndPad(min_crop_length=12), p=0.5),
-# RandomApplyTransform(Shear(), p=0.5),
-# RandomApplyTransform(HideSequenceSegment(min_ratio=0.1, max_ratio=0.3), p=0.5),
