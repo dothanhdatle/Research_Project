@@ -16,13 +16,14 @@ class MoCo_v3(nn.Module):
                  T_min = 0.05, 
                  T_type='fix'):
         """
-        dim: feature dimension (default: 128)
-        mlp_dim: hidden dimension in MLPs (default: 256)
-        m: momentum (default: 0.999)
-        T: temperature (default: 0.07)
-        T_max: max temperature for dynamic temperature (default: 0.2)
-        T_min: min temperature for dynamic temperature (default: 0.05)
-        T_type: fixed temperature or dynamic temperature refers to paper: https://arxiv.org/pdf/2308.01140v2
+        Params:
+            dim: feature dimension (default: 128)
+            mlp_dim: hidden dimension in MLPs (default: 256)
+            m: momentum (default: 0.999)
+            T: temperature (default: 0.07)
+            T_max: max temperature for dynamic temperature (default: 0.2)
+            T_min: min temperature for dynamic temperature (default: 0.05)
+            T_type: fixed temperature or dynamic temperature refers to paper: https://arxiv.org/pdf/2308.01140v2
         """
         super(MoCo_v3, self).__init__()
 

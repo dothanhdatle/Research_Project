@@ -11,7 +11,7 @@ from encoders.utils.graph import Graph
 class STGCN_model(nn.Module):
     r"""Spatial temporal graph convolutional networks.
 
-    Args:
+    Params:
         in_channels (int): Number of channels in the input data
         hidden_channels (int): Number of hidden channels
         hidden_dim (int): Number of hidden dimensions
@@ -93,7 +93,7 @@ class STGCN_model(nn.Module):
 class st_gcn(nn.Module):
     r"""Applies a spatial temporal graph convolution over an input graph sequence.
 
-    Args:
+    Params:
         in_channels (int): Number of channels in the input sequence data
         out_channels (int): Number of channels produced by the convolution
         kernel_size (tuple): Size of the temporal convolving kernel and spatial convolving kernel (temporal size, spatial size)

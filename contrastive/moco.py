@@ -8,11 +8,12 @@ class MoCo(nn.Module):
     """ Referring to the paper of MoCo: https://arxiv.org/abs/1911.05722 """
     def __init__(self, base_encoder, dim=128, K=65536, m=0.999, T=0.07, mlp=False):
         """
-        base_encoder: the encoder network to encode keys and queries
-        dim: feature dimension (default: 128)
-        K: queue size; number of negative keys (default: 65536)
-        m: moco momentum of updating key encoder (default: 0.999)
-        T: softmax temperature (default: 0.07)
+        Params:
+            base_encoder: the encoder network to encode keys and queries
+            dim: feature dimension (default: 128)
+            K: queue size; number of negative keys (default: 65536)
+            m: moco momentum of updating key encoder (default: 0.999)
+            T: softmax temperature (default: 0.07)
         """
         super(MoCo, self).__init__()
 
